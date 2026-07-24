@@ -1,0 +1,148 @@
+Organizations:
+  - &OrdererOrg
+    Name: OrdererMSP
+    ID: OrdererMSP
+    MSPDir: ../organizations/ordererOrganizations/ehr.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      Writers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      Admins:
+        Type: Signature
+        Rule: "OR('OrdererMSP.admin')"
+
+  - &HospitalOrg
+    Name: HospitalMSP
+    ID: HospitalMSP
+    MSPDir: ../organizations/peerOrganizations/hospital.ehr.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('HospitalMSP.admin', 'HospitalMSP.peer', 'HospitalMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('HospitalMSP.admin', 'HospitalMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('HospitalMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('HospitalMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.hospital.ehr.com
+        Port: 7051
+
+  - &PatientOrg
+    Name: PatientMSP
+    ID: PatientMSP
+    MSPDir: ../organizations/peerOrganizations/patient.ehr.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('PatientMSP.admin', 'PatientMSP.peer', 'PatientMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('PatientMSP.admin', 'PatientMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('PatientMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('PatientMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.patient.ehr.com
+        Port: 8051
+
+Capabilities:
+  Channel: &ChannelCapabilities
+    V2_0: true
+  Orderer: &OrdererCapabilities
+    V2_0: true
+  Application: &ApplicationCapabilities
+    V2_0: true
+
+Application: &ApplicationDefaults
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    LifecycleEndorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+    Endorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+  Capabilities:
+    <<: *ApplicationCapabilities
+
+Orderer: &OrdererDefaults
+  OrdererType: solo
+  Addresses:
+    - orderer.ehr.com:7050
+  BatchTimeout: 2s
+  BatchSize:
+    MaxMessageCount: 10
+    AbsoluteMaxBytes: 99 MB
+    PreferredMaxBytes: 512 KB
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    BlockValidation:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+  Capabilities:
+    <<: *OrdererCapabilities
+
+Channel: &ChannelDefaults
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+  Capabilities:
+    <<: *ChannelCapabilities
+
+Profiles:
+  TwoOrgsOrdererGenesis:
+    <<: *ChannelDefaults
+    Orderer:
+      <<: *OrdererDefaults
+      Organizations:
+        - *OrdererOrg
+    Consortiums:
+      EHRConsortium:
+        Organizations:
+          - *HospitalOrg
+          - *PatientOrg
+
+  TwoOrgsChannel:
+    Consortium: EHRConsortium
+    <<: *ChannelDefaults
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *HospitalOrg
+        - *PatientOrg

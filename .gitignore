@@ -1,0 +1,49 @@
+# Node modules
+node_modules/
+*/node_modules/
+
+# Environment variables
+.env
+*.env
+!.env.example
+
+# Fabric generated files
+fabric-network/organizations/
+fabric-network/channel-artifacts/
+fabric-network/*.tar.gz
+fabric-network/wallet/
+
+# Backend wallet
+backend/wallet/
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build directories
+build/
+dist/
+frontend/build/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Docker volumes
+*.pid
+
+# IPFS data
+.ipfs/
+ipfs/data/

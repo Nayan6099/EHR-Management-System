@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "body-parser": "^2.2.2",
+    "multer": "^2.1.1"
+  }
+}

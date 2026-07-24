@@ -1,0 +1,181 @@
+version: '3.7'
+
+networks:
+  ehr_network:
+    name: ehr_network
+
+services:
+  # Ordering Service
+  orderer.ehr.com:
+    container_name: orderer.ehr.com
+    hostname: orderer.ehr.com
+    image: hyperledger/fabric-orderer:2.5
+    environment:
+      - ORDERER_GENERAL_LOGLEVEL=info
+      - ORDERER_GENERAL_LISTENADDRESS=0.0.0.0
+      - ORDERER_GENERAL_LISTENPORT=7050
+      - ORDERER_GENERAL_GENESISMETHOD=file
+      - ORDERER_GENERAL_GENESISFILE=/var/hyperledger/orderer/genesis.block
+      - ORDERER_GENERAL_LOCALMSPID=OrdererMSP
+      - ORDERER_GENERAL_LOCALMSPDIR=/var/hyperledger/orderer/msp
+      - ORDERER_GENERAL_TLS_ENABLED=false
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric
+    command: orderer
+    volumes:
+      - ../channel-artifacts/genesis.block:/var/hyperledger/orderer/genesis.block
+      - ../organizations/ordererOrganizations/ehr.com/orderers/orderer.ehr.com/msp:/var/hyperledger/orderer/msp
+    ports:
+      - "7050:7050"
+    networks:
+      - ehr_network
+    
+
+  # Hospital Organization - Peer0
+  peer0.hospital.ehr.com:
+    container_name: peer0.hospital.ehr.com
+    hostname: peer0.hospital.ehr.com
+    image: hyperledger/fabric-peer:2.5
+    environment:
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      - CORE_PEER_ID=peer0.hospital.ehr.com
+      - CORE_PEER_ADDRESS=peer0.hospital.ehr.com:7051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:7051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.hospital.ehr.com:7052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.hospital.ehr.com:7051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.hospital.ehr.com:7051
+      - CORE_PEER_LOCALMSPID=HospitalMSP
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      - CORE_PEER_TLS_ENABLED=false
+      - CORE_LEDGER_STATE_STATEDATABASE=CouchDB
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdb0:5984
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=admin
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=adminpw
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
+    command: peer node start
+    volumes:
+      -  /var/run/docker.sock:/host/var/run/docker.sock
+      - ../organizations/peerOrganizations/hospital.ehr.com/peers/peer0.hospital.ehr.com/msp:/etc/hyperledger/fabric/msp
+      - ../organizations/peerOrganizations/hospital.ehr.com/peers/peer0.hospital.ehr.com/tls:/etc/hyperledger/fabric/tls
+      - /var/run/docker.sock:/run/docker.sock
+    ports:
+      - 7051:7051
+    depends_on:
+      - couchdb0
+    networks:
+      - ehr_network
+    
+
+  # CouchDB for Hospital Peer
+  couchdb0:
+    container_name: couchdb0
+    image: couchdb:3.1
+    environment:
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=adminpw
+    ports:
+      - 5984:5984
+    networks:
+      - ehr_network
+
+  # Patient Organization - Peer0
+  peer0.patient.ehr.com:
+    container_name: peer0.patient.ehr.com
+    hostname: peer0.patient.ehr.com
+    image: hyperledger/fabric-peer:2.5
+    environment:
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      - CORE_PEER_ID=peer0.patient.ehr.com
+      - CORE_PEER_ADDRESS=peer0.patient.ehr.com:8051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:8051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.patient.ehr.com:8052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:8052
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.patient.ehr.com:8051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.patient.ehr.com:8051
+      - CORE_PEER_LOCALMSPID=PatientMSP
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      - CORE_PEER_TLS_ENABLED=false
+      - CORE_LEDGER_STATE_STATEDATABASE=CouchDB
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdb1:5984
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=admin
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=adminpw
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
+    command: peer node start
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - ../organizations/peerOrganizations/patient.ehr.com/peers/peer0.patient.ehr.com/msp:/etc/hyperledger/fabric/msp
+      - ../organizations/peerOrganizations/patient.ehr.com/peers/peer0.patient.ehr.com/tls:/etc/hyperledger/fabric/tls
+      - /var/run/docker.sock:/run/docker.sock
+    ports:
+      - 8051:8051
+    depends_on:
+      - couchdb1
+    networks:
+      - ehr_network
+    
+
+  # CouchDB for Patient Peer
+  couchdb1:
+    container_name: couchdb1
+    image: couchdb:3.1
+    environment:
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=adminpw
+    ports:
+      - 6984:5984
+    networks:
+      - ehr_network
+
+  # CLI tool for network operations
+  cli:
+    container_name: cli
+    build:
+      context: ./cli
+    tty: true
+    stdin_open: true
+    environment:
+      - GOPATH=/opt/gopath
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      - FABRIC_LOGGING_SPEC=INFO
+      - CORE_PEER_ID=cli
+      - CORE_PEER_ADDRESS=peer0.hospital.ehr.com:7051
+      - CORE_PEER_LOCALMSPID=HospitalMSP
+      - CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/hospital.ehr.com/users/Admin@hospital.ehr.com/msp
+      - CORE_CHAINCODE_KEEPALIVE=10
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
+    command: >
+      bash -c "
+      sleep 10;
+      /bin/bash
+      "
+    volumes:
+      - ../chaincode/:/opt/gopath/src/github.com/chaincode
+      - ../organizations:/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations
+      - ../channel-artifacts:/opt/gopath/src/github.com/hyperledger/fabric/peer/channel-artifacts
+      - ../chaincode:/opt/gopath/src/github.com/hyperledger/fabric/peer/chaincode
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - /var/run/docker.sock:/run/docker.sock
+    depends_on:
+      - orderer.ehr.com
+      - peer0.hospital.ehr.com
+      - peer0.patient.ehr.com
+    networks:
+      - ehr_network
+
+    
+
+  ehr-chaincode:
+    container_name: ehr-chaincode
+    build:
+      context: ../chaincode/ehr
+    image: ehr-chaincode:latest
+    environment:
+      - CHAINCODE_SERVER_ADDRESS=0.0.0.0:9999
+      - CHAINCODE_ID=ehr_1.0:72f2e90e685c42f66f0ada0c960931fab8fd54bc5547f7ca6a2ff6862bf7f943
+      - NODE_ENV=production
+    ports:
+      - 9999:9999
+    networks:
+      - ehr_network
+    

@@ -1,0 +1,19 @@
+{
+  "name": "ehr-chaincode",
+  "version": "1.0.0",
+  "description": "Electronic Health Record Chaincode for Hyperledger Fabric",
+  "main": "index.js",
+  "engines": {
+    "node": ">=16",
+    "npm": ">=8"
+  },
+  "scripts": {
+    "start": "fabric-chaincode-node server --chaincode-address=$CHAINCODE_SERVER_ADDRESS --chaincode-id=$CHAINCODE_ID"
+  },
+  "dependencies": {
+    "fabric-contract-api": "^2.5.0",
+    "fabric-shim": "^2.5.0"
+  },
+  "author": "Final Year Project Team",
+  "license": "Apache-2.0"
+}

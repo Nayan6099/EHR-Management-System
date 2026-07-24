@@ -1,0 +1,79 @@
+{
+  "name": "ehr-network",
+  "version": "1.0.0",
+  "client": {
+    "organization": "Hospital",
+    "connection": {
+      "timeout": {
+        "peer": {
+          "endorser": "300"
+        },
+        "orderer": "300"
+      }
+    }
+  },
+  "channels": {
+    "ehrchannel": {
+      "orderers": [
+        "orderer.ehr.com"
+      ],
+      "peers": {
+        "peer0.hospital.ehr.com": {
+          "endorsingPeer": true,
+          "chaincodeQuery": true,
+          "ledgerQuery": true,
+          "eventSource": true
+        },
+        "peer0.patient.ehr.com": {
+          "endorsingPeer": true,
+          "chaincodeQuery": true,
+          "ledgerQuery": true,
+          "eventSource": true
+        }
+      }
+    }
+  },
+  "organizations": {
+    "Hospital": {
+      "mspid": "HospitalMSP",
+      "peers": [
+        "peer0.hospital.ehr.com"
+      ],
+      "certificateAuthorities": [
+        "ca.hospital.ehr.com"
+      ]
+    },
+    "Patient": {
+      "mspid": "PatientMSP",
+      "peers": [
+        "peer0.patient.ehr.com"
+      ],
+      "certificateAuthorities": [
+        "ca.patient.ehr.com"
+      ]
+    }
+  },
+  "orderers": {
+    "orderer.ehr.com": {
+      "url": "grpc://localhost:7050"
+    }
+  },
+  "peers": {
+    "peer0.hospital.ehr.com": {
+      "url": "grpc://localhost:7051"
+    },
+    "peer0.patient.ehr.com": {
+      "url": "grpc://localhost:8051"
+    }
+  },
+  "certificateAuthorities": {
+    "ca.hospital.ehr.com": {
+      "url": "http://localhost:7054",
+      "caName": "ca-hospital"
+    },
+    "ca.patient.ehr.com": {
+      "url": "http://localhost:8054",
+      "caName": "ca-patient"
+    }
+  }
+}

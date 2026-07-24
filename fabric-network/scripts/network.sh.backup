@@ -1,0 +1,167 @@
+#!/bin/bash
+
+# Script to start/stop Hyperledger Fabric network for EHR project
+
+function printHelp() {
+  echo "Usage: "
+  echo "  network.sh <Mode>"
+  echo "    Modes:"
+  echo "      up - Bring up the network"
+  echo "      down - Clear the network"
+  echo "      restart - Restart the network"
+  echo
+  echo "  Example: ./network.sh up"
+}
+
+# Set environment variables
+export IMAGE_TAG=2.5
+export COMPOSE_PROJECT_NAME=ehr
+
+# Generate crypto material (certificates)
+function generateCrypto() {
+  echo "=== Generating certificates for organizations ==="
+  
+  # Create directory structure
+  mkdir -p organizations/ordererOrganizations
+  mkdir -p organizations/peerOrganizations
+  
+  # Use cryptogen tool to generate certificates
+  cryptogen generate --config=./config/crypto-config.yaml --output=organizations
+  
+  echo "✓ Certificates generated successfully"
+}
+
+# Generate genesis block and channel configuration
+function generateChannelArtifacts() {
+  echo "=== Generating channel artifacts ==="
+  
+  mkdir -p channel-artifacts
+  
+  # Generate genesis block
+  configtxgen -profile TwoOrgsOrdererGenesis \
+    -channelID system-channel \
+    -outputBlock ./channel-artifacts/genesis.block \
+    -configPath ./config
+  
+  # Generate channel transaction
+  configtxgen -profile TwoOrgsChannel \
+    -outputCreateChannelTx ./channel-artifacts/ehrchannel.tx \
+    -channelID ehrchannel \
+    -configPath ./config
+  
+  # Generate anchor peer transactions
+  configtxgen -profile TwoOrgsChannel \
+    -outputAnchorPeersUpdate ./channel-artifacts/HospitalMSPanchors.tx \
+    -channelID ehrchannel \
+    -asOrg HospitalMSP \
+    -configPath ./config
+  
+  configtxgen -profile TwoOrgsChannel \
+    -outputAnchorPeersUpdate ./channel-artifacts/PatientMSPanchors.tx \
+    -channelID ehrchannel \
+    -asOrg PatientMSP \
+    -configPath ./config
+  
+  echo "✓ Channel artifacts generated successfully"
+}
+
+# Start the network
+function networkUp() {
+  echo "=== Starting EHR Blockchain Network ==="
+  
+  # Generate certificates and channel artifacts if not exist
+  if [ ! -d "organizations/peerOrganizations" ]; then
+    generateCrypto
+  fi
+  
+  if [ ! -d "channel-artifacts" ]; then
+    generateChannelArtifacts
+  fi
+  
+  # Start docker containers
+  cd docker
+  docker-compose up -d
+  cd ..
+  
+  echo "✓ Network started successfully"
+  echo ""
+  echo "Containers running:"
+  docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+  
+  # Wait for containers to be ready
+  echo ""
+  echo "Waiting for containers to be ready..."
+  sleep 10
+  
+  # Create and join channel
+  createChannel
+}
+
+# Create channel
+function createChannel() {
+  echo "=== Creating channel: ehrchannel ==="
+  
+  # Create channel
+  docker exec cli peer channel create \
+    -o orderer.ehr.com:7050 \
+    -c ehrchannel \
+    -f ./channel-artifacts/ehrchannel.tx \
+    --outputBlock ./channel-artifacts/ehrchannel.block
+  
+  echo "✓ Channel created"
+  
+  # Join Hospital peer to channel
+  echo "Joining peer0.hospital to channel..."
+  docker exec cli peer channel join \
+    -b ./channel-artifacts/ehrchannel.block
+  
+  # Join Patient peer to channel
+  echo "Joining peer0.patient to channel..."
+  docker exec -e CORE_PEER_LOCALMSPID=PatientMSP \
+    -e CORE_PEER_ADDRESS=peer0.patient.ehr.com:8051 \
+    -e CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/peerOrganizations/patient.ehr.com/users/Admin@patient.ehr.com/msp \
+    cli peer channel join -b ./channel-artifacts/ehrchannel.block
+  
+  echo "✓ All peers joined channel successfully"
+}
+
+# Stop and remove the network
+function networkDown() {
+  echo "=== Stopping EHR Blockchain Network ==="
+  
+  cd docker
+  docker-compose down --volumes --remove-orphans
+  cd ..
+  
+  # Clean up generated files
+  rm -rf organizations/ordererOrganizations
+  rm -rf organizations/peerOrganizations
+  rm -rf channel-artifacts
+  
+  # Remove chaincode containers and images
+  docker rm -f $(docker ps -aq --filter name=dev-peer*) 2>/dev/null || true
+  docker rmi -f $(docker images -q dev-peer*) 2>/dev/null || true
+  
+  echo "✓ Network stopped and cleaned"
+}
+
+# Restart network
+function networkRestart() {
+  networkDown
+  sleep 3
+  networkUp
+}
+
+# Main execution
+MODE=$1
+
+if [ "$MODE" == "up" ]; then
+  networkUp
+elif [ "$MODE" == "down" ]; then
+  networkDown
+elif [ "$MODE" == "restart" ]; then
+  networkRestart
+else
+  printHelp
+  exit 1
+fi
